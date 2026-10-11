@@ -48,7 +48,8 @@ use crate::menu::{MenuItem, MenuItemFields};
 use crate::notebooks::file::{
     MARKDOWN_DISPLAY_MODE_TOGGLE_CONTEXT, MarkdownDisplayMode,
     TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_DESCRIPTION, TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_NAME,
-    TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING, renders_in_warp_notebook_viewer,
+    TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING, location_matches_file_type,
+    renders_in_warp_notebook_viewer,
 };
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view::header::components::{
@@ -289,13 +290,13 @@ impl CodeView {
         view
     }
 
-    /// Whether the active tab's file can also be shown in the rendered notebook viewer. The file
-    /// may belong to a remote session, so this only looks at its name.
+    /// Whether the active tab's file can also be shown in the rendered notebook viewer.
     fn active_tab_renders_in_notebook_viewer(&self) -> bool {
         self.tab_at(self.active_tab_index)
             .and_then(|t| t.location.as_ref())
-            .and_then(|loc| loc.file_name())
-            .is_some_and(renders_in_warp_notebook_viewer)
+            .is_some_and(|loc| {
+                location_matches_file_type(loc, |path| renders_in_warp_notebook_viewer(path))
+            })
     }
 
     #[cfg(feature = "local_fs")]
