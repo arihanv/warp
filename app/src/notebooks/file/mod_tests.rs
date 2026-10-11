@@ -12,10 +12,14 @@ use warp_core::ui::appearance::Appearance;
 use warp_editor::render::model::BlockItem;
 #[cfg(feature = "local_fs")]
 use warp_files::FileModel;
+use warpui::keymap::Keystroke;
 use warpui::platform::WindowStyle;
 use warpui::{App, SingletonEntity, View};
 
-use super::{FileNotebookAction, FileNotebookView, FileState, MarkdownDisplayMode, SourceFile};
+use super::{
+    FileNotebookAction, FileNotebookView, FileState, MarkdownDisplayMode, SourceFile,
+    TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING,
+};
 use crate::auth::AuthStateProvider;
 use crate::auth::auth_manager::AuthManager;
 use crate::cloud_object::model::persistence::CloudModel;
@@ -474,5 +478,41 @@ fn test_file_notebook_mermaid_context_menu_does_not_show_copy_image() {
             let item_names = file_notebook.context_menu.item_names(ctx);
             assert!(!item_names.contains(&"Copy image"));
         });
+    });
+}
+
+#[test]
+fn test_markdown_toggle_shortcut_only_handled_for_toggleable_files() {
+    App::test((), |mut app| async move {
+        init_app(&mut app);
+        app.update(super::init);
+        let (window_id, handle) = app.add_window(WindowStyle::NotStealFocus, FileNotebookView::new);
+        let session = Arc::new(Session::test());
+        let keystroke = Keystroke::parse(TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING).unwrap();
+        let press_shortcut = |app: &App| {
+            app.dispatch_keystroke(window_id, &[handle.id()], &keystroke, false)
+                .unwrap()
+        };
+
+        assert!(
+            !press_shortcut(&app),
+            "a pane with no file has no raw view to switch to"
+        );
+
+        handle.update(&mut app, |file_notebook, ctx| {
+            file_notebook.open_local("../README.md", Some(session.clone()), ctx);
+        });
+        assert!(
+            press_shortcut(&app),
+            "a rendered Markdown file should be toggleable from the keyboard"
+        );
+
+        handle.update(&mut app, |file_notebook, ctx| {
+            file_notebook.open_local("../Cargo.toml", Some(session), ctx);
+        });
+        assert!(
+            !press_shortcut(&app),
+            "a file without a Rendered/Raw toggle should not respond to the shortcut"
+        );
     });
 }

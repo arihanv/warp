@@ -45,7 +45,11 @@ use crate::code::{EditorTabBarDropTargetData, ImmediateSaveError, SaveOutcome, S
 use crate::editor::InteractionState;
 use crate::input::Vector2F;
 use crate::menu::{MenuItem, MenuItemFields};
-use crate::notebooks::file::{MarkdownDisplayMode, renders_in_warp_notebook_viewer};
+use crate::notebooks::file::{
+    MARKDOWN_DISPLAY_MODE_TOGGLE_CONTEXT, MarkdownDisplayMode,
+    TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_DESCRIPTION, TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_NAME,
+    TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING, renders_in_warp_notebook_viewer,
+};
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view::header::components::{
     CenteredHeaderEdgeWidth, render_pane_header_buttons, render_pane_header_title_text,
@@ -122,6 +126,14 @@ pub fn init(app: &mut AppContext) {
         )
         .with_context_predicate(id!("CodeEditorView"))
         .with_key_binding("cmdorctrl-r u"),
+        #[cfg(feature = "local_fs")]
+        EditableBinding::new(
+            TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_NAME,
+            TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_DESCRIPTION,
+            CodeViewAction::RenderMarkdown,
+        )
+        .with_context_predicate(id!("CodeView") & id!(MARKDOWN_DISPLAY_MODE_TOGGLE_CONTEXT))
+        .with_key_binding(TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING),
     ]);
 }
 
@@ -277,15 +289,17 @@ impl CodeView {
         view
     }
 
+    /// Whether the active tab's file can also be shown in the rendered notebook viewer. The path
+    /// may belong to a remote session, so this reads its standardized form.
+    fn active_tab_renders_in_notebook_viewer(&self) -> bool {
+        self.tab_at(self.active_tab_index)
+            .and_then(|t| t.location.as_ref())
+            .is_some_and(|loc| renders_in_warp_notebook_viewer(loc.path_component().as_str()))
+    }
+
     #[cfg(feature = "local_fs")]
     fn update_markdown_mode_segmented_control(&mut self, ctx: &mut ViewContext<Self>) {
-        let renders_in_notebook_viewer = self
-            .tab_at(self.active_tab_index)
-            .and_then(|t| t.location.as_ref())
-            .map(|loc| renders_in_warp_notebook_viewer(std::path::Path::new(&loc.display_path())))
-            .unwrap_or(false);
-
-        if !renders_in_notebook_viewer {
+        if !self.active_tab_renders_in_notebook_viewer() {
             self.markdown_mode_segmented_control = None;
             ctx.notify();
             return;
@@ -2240,6 +2254,14 @@ impl Entity for CodeView {
 impl View for CodeView {
     fn ui_name() -> &'static str {
         "CodeView"
+    }
+
+    fn keymap_context(&self, _app: &AppContext) -> warpui::keymap::Context {
+        let mut context = Self::default_keymap_context();
+        if self.active_tab_renders_in_notebook_viewer() {
+            context.set.insert(MARKDOWN_DISPLAY_MODE_TOGGLE_CONTEXT);
+        }
+        context
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
