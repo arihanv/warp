@@ -289,12 +289,13 @@ impl CodeView {
         view
     }
 
-    /// Whether the active tab's file can also be shown in the rendered notebook viewer. The path
-    /// may belong to a remote session, so this reads its standardized form.
+    /// Whether the active tab's file can also be shown in the rendered notebook viewer. The file
+    /// may belong to a remote session, so this only looks at its name.
     fn active_tab_renders_in_notebook_viewer(&self) -> bool {
         self.tab_at(self.active_tab_index)
             .and_then(|t| t.location.as_ref())
-            .is_some_and(|loc| renders_in_warp_notebook_viewer(loc.path_component().as_str()))
+            .and_then(|loc| loc.file_name())
+            .is_some_and(renders_in_warp_notebook_viewer)
     }
 
     #[cfg(feature = "local_fs")]

@@ -763,18 +763,19 @@ impl FileNotebookView {
         self.links.clone()
     }
 
+    // The file may belong to a remote session, so these only look at its name.
     fn is_markdown_file(&self) -> bool {
         self.file_state
             .path()
-            .map(|p| is_markdown_file(Path::new(&p.display_path())))
-            .unwrap_or(false)
+            .and_then(|p| p.file_name())
+            .is_some_and(is_markdown_file)
     }
 
     fn is_jupyter_notebook_file(&self) -> bool {
         self.file_state
             .path()
-            .map(|p| is_jupyter_notebook_file(Path::new(&p.display_path())))
-            .unwrap_or(false)
+            .and_then(|p| p.file_name())
+            .is_some_and(is_jupyter_notebook_file)
     }
 
     fn shows_markdown_toggle(&self) -> bool {
