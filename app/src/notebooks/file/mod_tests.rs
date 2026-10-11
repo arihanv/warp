@@ -516,3 +516,49 @@ fn test_markdown_toggle_shortcut_only_handled_for_toggleable_files() {
         );
     });
 }
+
+#[test]
+fn test_markdown_toggle_shortcut_follows_jupyter_notebook_rendering_flag() {
+    App::test((), |mut app| async move {
+        init_app(&mut app);
+        app.update(super::init);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("analysis.ipynb");
+        std::fs::write(
+            &path,
+            r##"{
+                "nbformat": 4,
+                "nbformat_minor": 5,
+                "metadata": {"language_info": {"name": "python"}},
+                "cells": [{"cell_type": "markdown", "source": ["# Notebook heading"]}]
+            }"##,
+        )
+        .unwrap();
+
+        let (window_id, handle) = app.add_window(WindowStyle::NotStealFocus, FileNotebookView::new);
+        let session = Arc::new(Session::test());
+        handle.update(&mut app, |file_notebook, ctx| {
+            file_notebook.open_local(&path, Some(session), ctx);
+        });
+        let keystroke = Keystroke::parse(TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING).unwrap();
+        let press_shortcut = |app: &App| {
+            app.dispatch_keystroke(window_id, &[handle.id()], &keystroke, false)
+                .unwrap()
+        };
+
+        {
+            let _flag = FeatureFlag::JupyterNotebookRendering.override_enabled(false);
+            assert!(
+                !press_shortcut(&app),
+                "a notebook has no Rendered/Raw toggle while notebook rendering is disabled"
+            );
+        }
+
+        let _flag = FeatureFlag::JupyterNotebookRendering.override_enabled(true);
+        assert!(
+            press_shortcut(&app),
+            "a rendered notebook should be toggleable from the keyboard"
+        );
+    });
+}
