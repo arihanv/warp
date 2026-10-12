@@ -1299,23 +1299,35 @@ fn test_markdown_toggle_shortcut_switches_between_raw_and_rendered_panes() {
             })
         };
 
+        // Sends the keystroke the way a real key press is routed: through the focused view and its
+        // ancestors, so a binding on the focused editor would take precedence over the pane's.
+        // Returns whether it was handled, after checking that focus is on a view inside `pane`.
+        let press_shortcut_in_focused_child_of = |app: &mut App, pane: EntityId| {
+            let responder_chain = app.read(|ctx| {
+                let focused = ctx
+                    .focused_view_id(window_id)
+                    .expect("a view should be focused");
+                ctx.view_ancestors(window_id, focused)
+            });
+            assert!(
+                responder_chain.contains(&pane) && responder_chain.last() != Some(&pane),
+                "focus should be on a child of the pane"
+            );
+            app.dispatch_keystroke(window_id, &responder_chain, &keystroke, false)
+                .unwrap()
+        };
+
         open_in_code_editor(&mut app, &markdown_path);
         let (code_views, file_views) = pane_view_ids(&app);
         assert_eq!((code_views.len(), file_views.len()), (1, 0));
 
         // Raw -> rendered.
-        assert!(
-            app.dispatch_keystroke(window_id, &code_views, &keystroke, false)
-                .unwrap()
-        );
+        assert!(press_shortcut_in_focused_child_of(&mut app, code_views[0]));
         let (code_views, file_views) = pane_view_ids(&app);
         assert_eq!((code_views.len(), file_views.len()), (0, 1));
 
         // Rendered -> raw.
-        assert!(
-            app.dispatch_keystroke(window_id, &file_views, &keystroke, false)
-                .unwrap()
-        );
+        assert!(press_shortcut_in_focused_child_of(&mut app, file_views[0]));
         let (code_views, file_views) = pane_view_ids(&app);
         assert_eq!((code_views.len(), file_views.len()), (1, 0));
 
@@ -1327,10 +1339,10 @@ fn test_markdown_toggle_shortcut_switches_between_raw_and_rendered_panes() {
             .filter(|id| !code_views.contains(id))
             .collect_vec();
         assert_eq!(non_markdown_views.len(), 1);
-        assert!(
-            !app.dispatch_keystroke(window_id, &non_markdown_views, &keystroke, false)
-                .unwrap()
-        );
+        assert!(!press_shortcut_in_focused_child_of(
+            &mut app,
+            non_markdown_views[0]
+        ));
         let (code_views, file_views) = pane_view_ids(&app);
         assert_eq!((code_views.len(), file_views.len()), (2, 0));
     });
