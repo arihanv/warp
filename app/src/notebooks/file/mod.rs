@@ -225,20 +225,6 @@ pub const TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_DESCRIPTION: &str =
     "Toggle Markdown rendered/raw view";
 pub const TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING: &str = "cmdorctrl-e";
 
-/// Runs a file-type check against a location. A local file is checked by its real path. A remote
-/// file may not follow local path conventions, so only its name is looked at.
-pub(crate) fn location_matches_file_type(
-    location: &LocalOrRemotePath,
-    is_file_type: impl Fn(&Path) -> bool,
-) -> bool {
-    match location.to_local_path() {
-        Some(path) => is_file_type(path),
-        None => location
-            .file_name()
-            .is_some_and(|name| is_file_type(Path::new(name))),
-    }
-}
-
 pub fn init(app: &mut AppContext) {
     use warpui::keymap::macros::*;
 
@@ -780,13 +766,15 @@ impl FileNotebookView {
     fn is_markdown_file(&self) -> bool {
         self.file_state
             .path()
-            .is_some_and(|p| location_matches_file_type(p, |path| is_markdown_file(path)))
+            .map(|p| is_markdown_file(Path::new(&p.display_path())))
+            .unwrap_or(false)
     }
 
     fn is_jupyter_notebook_file(&self) -> bool {
         self.file_state
             .path()
-            .is_some_and(|p| location_matches_file_type(p, |path| is_jupyter_notebook_file(path)))
+            .map(|p| is_jupyter_notebook_file(Path::new(&p.display_path())))
+            .unwrap_or(false)
     }
 
     fn shows_markdown_toggle(&self) -> bool {

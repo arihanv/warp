@@ -48,8 +48,7 @@ use crate::menu::{MenuItem, MenuItemFields};
 use crate::notebooks::file::{
     MARKDOWN_DISPLAY_MODE_TOGGLE_CONTEXT, MarkdownDisplayMode,
     TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_DESCRIPTION, TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_NAME,
-    TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING, location_matches_file_type,
-    renders_in_warp_notebook_viewer,
+    TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING, renders_in_warp_notebook_viewer,
 };
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view::header::components::{
@@ -294,9 +293,8 @@ impl CodeView {
     fn active_tab_renders_in_notebook_viewer(&self) -> bool {
         self.tab_at(self.active_tab_index)
             .and_then(|t| t.location.as_ref())
-            .is_some_and(|loc| {
-                location_matches_file_type(loc, |path| renders_in_warp_notebook_viewer(path))
-            })
+            .map(|loc| renders_in_warp_notebook_viewer(std::path::Path::new(&loc.display_path())))
+            .unwrap_or(false)
     }
 
     #[cfg(feature = "local_fs")]
